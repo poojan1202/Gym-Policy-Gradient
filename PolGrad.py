@@ -1,3 +1,5 @@
+import random
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as functions
@@ -34,6 +36,29 @@ class Critic_Network(nn.Module):
         x = functions.relu(self.linear2(x))
         x = self.linear3(x)
         return x
+
+
+class ReplayMemory():
+    def __init__(self,size):
+        self.size = size
+        self.memory = [[],[],[],[],[]]
+    def store(self,data):
+        if len(self.memory[0])==self.size:
+            for idx in range(5):
+                self.memory[idx].pop(0)
+        for idx,part in enumerate(data):
+            self.memory[idx].append(part)
+    def sample(self,batch_size):
+        rows = random.sample(range(0,len(self.memory[0])),batch_size)
+        experiences = [[],[],[],[],[]]
+        for row in rows:
+            for col in range(5):
+                experiences[col].append(self.memory[col][row])
+        return experiences
+
+    def __len__(self):
+        return len(self.memory[0])
+
 
 #class Agent():
 
