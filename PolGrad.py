@@ -78,6 +78,8 @@ def trainer(AN, CN, nE):
 			h_S.append(S)
 			h_act.append(action)
 			h_rev.append(R)
+			h_crit.append(crit)
+			h_ln_p.append(ln_p)
 
 
 actor = Actor_Network(2,2)
