@@ -52,6 +52,7 @@ def discounted_rewards(h_rev, gamma):
     nRev.append(val)
   return (nRev[::-1])
 
+"""
 def trainer(nE, lr = 0.01, gamma = 0.9):
   optimA = torch.optim.Adam(actor.parameters(), lr)
   optimC = torch.optim.Adam(critic.parameters(), lr)
@@ -110,6 +111,82 @@ def trainer(nE, lr = 0.01, gamma = 0.9):
     optimC.step()
     E = E + 1
     lengths.append(length)
+"""
+
+def Q_trainer(nE, lr = 0.01, gamma = 0.9):
+  optimA = torch.optim.Adam(actor.parameters(), lr)
+  optimC = torch.optim.Adam(critic.parameters(), lr)
+  E = 0
+  lengths = []
+  rewards = []
+  pl = []
+  cl = []
+  while (E < nE):
+    S = env.reset()
+    #env.render()
+    Erev = 0
+    done = False
+    p_loss = 0
+    length = 0
+    while not done:
+      S = torch.FloatTensor(S)
+      pol_s1 = actor(S)
+      dist1 = torch.distributions.Normal(pol_s1[0], abs(pol_s1[1]))
+      action1 = dist1.sample()
+
+      nS, R, done, _ = env.step([action1.item()])
+
+      tnS = torch.FloatTensor(nS)
+      pol_s2 = actor(tnS)
+      dist2 = torch.distributions.Normal(pol_s2[0], abs(pol_s2[1]))
+      action2 = dist2.sample()
+      
+      action1 = torch.flatten(torch.reshape(action1, (1,1)))
+      with torch.no_grad():
+        val1 = critic(torch.cat((S, action1)))
+      ln_p = dist1.log_prob(action1)
+      
+      optimA.zero_grad()
+      p_loss = (ln_p*val1)
+      p_loss.backward()
+      optimA.step()
+
+      action2 = torch.flatten(torch.reshape(action2, (1,1)))
+      with torch.no_grad():
+        val2 = critic(torch.cat((tnS, action2)))
+      val1 = critic(torch.cat((S, action1)))
+      targe = R + (gamma*val2) - (val1)
+      
+      optimC.zero_grad()
+      c_loss = targe*val1
+      c_loss.backward(retain_graph = True)
+      optimC.step() 
+
+      S = nS
+
+      Erev += R
+      length += 1
+
+      cl.append(c_loss[0].item())
+      pl.append(p_loss[0].item())
+    E = E+1
+    rewards.append(Erev)
+    lengths.append(length)
+    print(E)
+  show = 1
+  if show:
+    print("Reward vs Epsiode")
+    plot = plt.plot([i for i in range(len(rewards))],rewards)
+    plt.show()
+    print("Critic Loss vs Step")
+    plot = plt.plot([i for i in range(len(cl))],cl)
+    plt.show()
+    print("Actor Loss vs Step")
+    plot = plt.plot([i for i in range(len(pl))],pl)
+    plt.show()
+    #print("Length vs Episode")
+    #plot = plt.plot([i for i in range(len(lengths))],lengths)
+    #plt.show()
 
 def test(nT):
   scores = []
@@ -118,22 +195,24 @@ def test(nT):
     score = 0
     done = False
     while not done:
-      S = torch.FloatTorch(S)
+      env.render()
+      S = torch.FloatTensor(S)
       dist = actor(S)
       dist = torch.distributions.Normal(dist[0],abs(dist[1]))
       action = dist.sample()
-      nS, R, done, _ = env.step(action.item())
+      #print(action)
+      nS, R, done, _ = env.step([action.item()])
       score = R + score
       S = nS
     scores.append(score)
-    print("Score - ", score)
-  print("Avg Score - ", scores.sum()/len(scores))
+    print("Score\t - ", score)
+  print("Avg Score\t - ", sum(scores)/len(scores))
 
 if __name__ == "__main__":
-	env = gym.make('Pendulum-v1')
-	env.reset()
-	Loss = nn.MSELoss()
-	actor = AN(3,2)
-	critic = CN(3)
-	trainer(500)
-	test(10)
+  env = gym.make('Pendulum-v1')
+  env.reset()
+  Loss = nn.MSELoss()
+  actor = AN(3,2)
+  critic = CN(4)
+  Q_trainer(1500)
+  test(10)
